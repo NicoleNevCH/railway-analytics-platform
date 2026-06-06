@@ -1,0 +1,6 @@
+# Dependencies to run, ON THE HOST, the chaos simulator and the orchestrator.
+# (The services themselves carry their own requirements inside each image.)
+#
+#   python -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements.txt
+httpx==0.28.1

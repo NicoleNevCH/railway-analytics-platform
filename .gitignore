@@ -1,0 +1,23 @@
+# Ambiente / segredos
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env.local
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Dados locais / saídas
+data/
+*.duckdb
+*.duckdb.wal
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
