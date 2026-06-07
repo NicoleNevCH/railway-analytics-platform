@@ -12,6 +12,7 @@ Endpoints:
   GET  /trips/delayed?min_delay=10 -> trips delayed above a threshold
   GET  /stats/by-station           -> average delay per current station
   GET  /stats/by-operator          -> volume and punctuality per operator
+  GET  /stats/delay-distribution   -> histogram of trips by delay band
   GET  /trips/{trip_id}            -> the single consolidated row of a trip
   POST /refresh                    -> reloads the Iceberg metadata pointer
 """
@@ -194,6 +195,39 @@ def by_operator():
         ORDER BY trips DESC
         """
     )
+
+
+@app.get("/stats/delay-distribution")
+def delay_distribution():
+    """Histogram of trips by delay band — the *shape* of lateness.
+
+    Buckets are labelled with a numeric prefix so any chart keeps them in order
+    (0-5, 5-15, ...) instead of sorting them alphabetically.
+    """
+    rows = _safe_query(
+        """
+        SELECT
+            CASE
+                WHEN delay_minutes IS NULL THEN 4
+                WHEN delay_minutes <= 5  THEN 0
+                WHEN delay_minutes <= 15 THEN 1
+                WHEN delay_minutes <= 30 THEN 2
+                ELSE 3
+            END AS bucket_ord,
+            COUNT(*) AS trips
+        FROM train_events
+        GROUP BY bucket_ord
+        ORDER BY bucket_ord
+        """
+    )
+    labels = {
+        0: "1) 0-5 min (on time)",
+        1: "2) 5-15 min",
+        2: "3) 15-30 min",
+        3: "4) 30+ min",
+        4: "5) unknown",
+    }
+    return [{"bucket": labels[r["bucket_ord"]], "trips": r["trips"]} for r in rows]
 
 
 @app.get("/trips/{trip_id}")

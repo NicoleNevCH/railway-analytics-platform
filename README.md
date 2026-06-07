@@ -239,6 +239,7 @@ even after receiving several updates. (The notebook has the same proof.)
 | `GET` | `/trips/delayed?min_delay=&limit=` | Delayed trips (filter by minimum delay) |
 | `GET` | `/stats/by-station` | Aggregations per station |
 | `GET` | `/stats/by-operator` | Aggregations per operator |
+| `GET` | `/stats/delay-distribution` | Histogram of trips by delay band (0-5, 5-15, 15-30, 30+) |
 | `GET` | `/trips/{trip_id}` | State of a trip (proves the UPSERT) |
 | `POST` | `/refresh` | Reloads the DuckDB view onto the most recent Iceberg metadata |
 
@@ -257,12 +258,14 @@ even after receiving several updates. (The notebook has the same proof.)
 ## 📊 Dashboard (Streamlit)
 
 A friendly UI over the two APIs, at **http://localhost:8501**. It shows the
-pipeline status board (Bronze / Silver / DLQ counts), the punctuality KPIs, and
-charts for delay by operator and by station, plus a table of the worst delays.
+pipeline status board (Bronze / Silver / DLQ counts), the punctuality KPIs, a
+**delay-distribution histogram** and average delay by station, plus a table of
+the worst delays.
 
-It also has a **chaos generator** in the sidebar: set the trip count and defect
-rates, click *Send events*, and watch the accept/reject scoreboard — the
-validation gate, live. After sending, run `make process` and click *Refresh
+It also has a **chaos generator** in the sidebar, with plain-language controls
+(percentage of faulty events, etc. — each with a tooltip): set the trip count
+and defect rates, click *Send events*, and watch the accept/reject scoreboard —
+the validation gate, live. After sending, run `make process` and click *Refresh
 data* to see the new trips flow into the analytics.
 
 ## 📓 Exploration notebook

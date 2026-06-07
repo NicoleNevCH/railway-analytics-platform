@@ -84,17 +84,41 @@ with st.sidebar:
 
     st.divider()
     st.subheader("🌩️ Chaos generator")
-    st.caption("Send synthetic train events through the ingestion gate.")
-    n_trips = st.slider("Trips", 10, 500, 120, step=10)
-    n_updates = st.slider("Updates per trip", 1, 6, 3)
-    null_rate = st.slider("Null-station rate", 0.0, 0.5, 0.12, step=0.01)
-    mess_rate = st.slider("Time-inversion rate", 0.0, 0.5, 0.10, step=0.01)
-    delayed_rate = st.slider("Delayed rate", 0.0, 0.8, 0.35, step=0.05)
+    st.caption(
+        "Create synthetic train events — including deliberate defects — to watch "
+        "the pipeline catch bad data without breaking."
+    )
+    n_trips = st.slider("Trips to generate", 10, 500, 120, step=10)
+    n_updates = st.slider(
+        "Updates per trip", 1, 6, 3,
+        help="The same trip is sent several times (like live status updates). "
+             "The pipeline must collapse them into ONE row — this is what proves "
+             "the de-duplication (UPSERT) works.",
+    )
+    pct_missing = st.slider(
+        "Faulty events: missing station ID (%)", 0, 50, 12,
+        help="This share of events arrives with NO station ID (a sensor glitch). "
+             "They fail validation at the gate and are sent to the error queue "
+             "(DLQ) — they never reach your clean data.",
+    )
+    pct_inverted = st.slider(
+        "Faulty events: reversed timestamps (%)", 0, 50, 10,
+        help="This share of events has the arrival BEFORE the departure "
+             "(impossible). Spark catches these later and quarantines them.",
+    )
+    pct_late = st.slider(
+        "Trains actually running late (%)", 0, 80, 35,
+        help="How often a trip is genuinely delayed (more than 5 min). Drives how "
+             "many show up as DELAYED in the KPIs.",
+    )
 
     if st.button("Send events ▶", type="primary", use_container_width=True):
         with st.spinner("Sending to ingestion API..."):
             try:
-                rec, acc, rej = send_events(n_trips, n_updates, null_rate, mess_rate, delayed_rate)
+                rec, acc, rej = send_events(
+                    n_trips, n_updates,
+                    pct_missing / 100, pct_inverted / 100, pct_late / 100,
+                )
                 st.success(f"Sent {rec} • accepted {acc} • rejected→DLQ {rej}")
                 st.info("Now run `make process` (Spark), then click **Refresh data**.")
             except Exception as exc:  # noqa: BLE001
@@ -155,15 +179,14 @@ st.divider()
 left, right = st.columns(2)
 
 with left:
-    st.subheader("Avg delay by operator")
-    ops = api_get("/stats/by-operator")
-    if isinstance(ops, list) and ops:
-        df = pd.DataFrame(ops).set_index("operator")
-        st.bar_chart(df[["avg_delay_minutes"]].fillna(0))
-        st.caption("On-time % per operator")
-        st.bar_chart(df[["on_time_pct"]].fillna(0))
+    st.subheader("Delay distribution")
+    dist = api_get("/stats/delay-distribution")
+    if isinstance(dist, list) and dist:
+        ddist = pd.DataFrame(dist).set_index("bucket")
+        st.bar_chart(ddist[["trips"]])
+        st.caption("How many trips fall in each lateness band (minutes).")
     else:
-        st.write("No operator data.")
+        st.write("No distribution data.")
 
 with right:
     st.subheader("Avg delay by station (top 12)")
