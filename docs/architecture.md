@@ -154,5 +154,5 @@ The table is partitioned by `trip_date`.
   not for production volume.
 - **Default credentials** (`minioadmin`): change them outside a local
   environment.
-- **`unsafe_enable_version_guessing` / `allow_moved_paths`** in DuckDB are
-  conveniences for the local environment; reassess them in production.
+- **`unsafe_enable_version_guessing`** in DuckDB is a convenience for the local
+  environment; reassess it in production.

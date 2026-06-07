@@ -117,3 +117,14 @@ class IcebergQueryEngine:
         with self._lock:
             self._view_ready = False
             self._ensure_view(refresh=True)
+
+    def latest_metadata_uri(self) -> str | None:
+        """Public, non-throwing lookup of the current metadata file (or None).
+
+        Catches broad exceptions on purpose: this feeds the status board, which
+        must never crash — including when MinIO is unreachable or has no bucket.
+        """
+        try:
+            return self._latest_metadata_uri()
+        except Exception:  # noqa: BLE001
+            return None

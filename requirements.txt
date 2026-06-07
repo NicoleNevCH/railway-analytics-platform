@@ -1,6 +1,6 @@
-# Dependencies to run, ON THE HOST, the chaos simulator and the orchestrator.
-# (The services themselves carry their own requirements inside each image.)
-#
-#   python -m venv .venv && source .venv/bin/activate
-#   pip install -r requirements.txt
+jupyterlab==4.3.4
+duckdb==1.1.3
+boto3==1.35.90
+pandas==2.2.3
 httpx==0.28.1
+matplotlib==3.10.0

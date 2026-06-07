@@ -200,6 +200,28 @@ services:
     networks:
       - railway
 
+  # -------------------------------------------------------------------------
+  # Dashboard — Streamlit UI over the two APIs (KPIs, charts, chaos generator).
+  # -------------------------------------------------------------------------
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    image: railway/dashboard:1.0.0
+    container_name: railway-dashboard
+    environment:
+      CONSUMPTION_URL: "http://consumption-api:8001"
+      INGESTION_URL: "http://ingestion-api:8000"
+    ports:
+      - "8501:8501"
+    depends_on:
+      consumption-api:
+        condition: service_healthy
+      ingestion-api:
+        condition: service_healthy
+    networks:
+      - railway
+
 networks:
   railway:
     driver: bridge

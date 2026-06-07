@@ -22,7 +22,7 @@ TIME_MESS_RATE     ?= 0.10
 DELAYED_RATE       ?= 0.35
 SEED               ?= 42
 
-.PHONY: help build up down restart ps logs init simulate process query pipeline lab clean
+.PHONY: help build up down restart ps logs init simulate process query status pipeline lab clean
 
 help:
 	@echo "Available targets:"
@@ -36,6 +36,7 @@ help:
 	@echo "  simulate  - generate events with chaos injection (host: needs httpx)"
 	@echo "  process   - run the Spark job (Bronze -> Silver/Iceberg)"
 	@echo "  query     - print the punctuality KPIs (consumption API)"
+	@echo "  status    - print the pipeline status (Bronze/Silver/DLQ counts)"
 	@echo "  pipeline  - simulate + process + query, end to end"
 	@echo "  lab       - show the Jupyter URL"
 	@echo "  clean     - tear down the stack AND delete the volumes (wipes data)"
@@ -45,6 +46,7 @@ build:
 
 up:
 	$(COMPOSE) up -d
+	@echo "Dashboard    : http://localhost:8501"
 	@echo "MinIO console : http://localhost:9001  (minioadmin / minioadmin)"
 	@echo "Ingestion API : http://localhost:8000/docs"
 	@echo "Consumption   : http://localhost:8001/docs"
@@ -84,6 +86,11 @@ query:
 req=urllib.request.Request('http://localhost:8001/refresh', data=b'', method='POST'); \
 urllib.request.urlopen(req); \
 s=json.load(urllib.request.urlopen('http://localhost:8001/stats/punctuality')); \
+print(json.dumps(s, indent=2, ensure_ascii=False))"
+
+status:
+	@$(PY) -c "import json,urllib.request; \
+s=json.load(urllib.request.urlopen('http://localhost:8001/pipeline/status')); \
 print(json.dumps(s, indent=2, ensure_ascii=False))"
 
 pipeline:

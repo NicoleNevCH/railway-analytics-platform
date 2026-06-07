@@ -8,12 +8,21 @@
 # Base: Bitnami Spark 3.5.1 (Scala 2.12). Spark lives at /opt/bitnami/spark and
 # the jars go to /opt/bitnami/spark/jars — the same directory spark-submit
 # already loads onto the classpath.
+#
+# NOTE: as of Aug 2025 Bitnami moved its Docker Hub images to the
+# `bitnamilegacy/` namespace (versioned tags were removed from `bitnami/`).
+# We pin the archived image so the build keeps working. The legacy images are
+# frozen (no security updates); for a long-lived project, migrate to a
+# maintained Spark base (e.g. the official `apache/spark`) or Bitnami Secure Images.
 FROM bitnamilegacy/spark:3.5.1
 
 # We need root only to write into /opt/bitnami/spark/jars.
 USER root
 
-# Bitnami's minimal base does not ship curl — install it before the downloads.
+# Bitnami's minimal base does not ship curl by default — install it before the
+# downloads. `install_packages` is Bitnami's apt wrapper (from minideb). If it
+# is ever unavailable, swap for:
+#   RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN install_packages curl ca-certificates
 
 # Pinned versions of the connectors.
@@ -28,7 +37,7 @@ ENV ICEBERG_VERSION=1.6.1 \
 ARG MAVEN=https://repo1.maven.org/maven2
 ARG JARS=/opt/bitnami/spark/jars
 
-# curl already exists in the base; download the 4 jars and verify they are non-empty.
+# Download the 4 jars and verify they are non-empty.
 RUN set -eux; \
     curl -fSL "${MAVEN}/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/${ICEBERG_VERSION}/iceberg-spark-runtime-3.5_2.12-${ICEBERG_VERSION}.jar" \
         -o "${JARS}/iceberg-spark-runtime-3.5_2.12-${ICEBERG_VERSION}.jar"; \

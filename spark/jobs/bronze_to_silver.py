@@ -98,6 +98,12 @@ def build_spark() -> SparkSession:
             "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
         )
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+        # Map the bare s3:// scheme to S3A as well. The Iceberg HadoopCatalog
+        # uses the Hadoop FileSystem to manage the warehouse DIRECTORY (CREATE
+        # NAMESPACE, table folders, commit renames) — independent of io-impl —
+        # so Hadoop must know how to resolve s3://. S3A reads its config from the
+        # fs.s3a.* keys regardless of scheme, so the settings above still apply.
+        # Without this line: "UnsupportedFileSystemException: No FileSystem for scheme s3".
         .config("spark.hadoop.fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         .config("spark.sql.session.timeZone", "UTC")
     )

@@ -14,6 +14,8 @@ class Settings:
     s3_region: str = os.getenv("S3_REGION", "us-east-1")
 
     silver_bucket: str = os.getenv("SILVER_BUCKET", "silver")
+    bronze_bucket: str = os.getenv("BRONZE_BUCKET", "bronze")
+    errors_bucket: str = os.getenv("ERRORS_BUCKET", "errors")
     warehouse_prefix: str = os.getenv("ICEBERG_WAREHOUSE_PREFIX", "warehouse")
     namespace: str = os.getenv("ICEBERG_NAMESPACE", "railway")
     table: str = os.getenv("ICEBERG_TABLE", "train_events")

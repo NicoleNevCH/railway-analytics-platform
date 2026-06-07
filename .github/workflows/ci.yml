@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    name: Unit & integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ingestion_api/requirements.txt
+          pip install pytest httpx
+
+      - name: Run tests
+        run: pytest -q tests/
+
+  lint:
+    name: Compile check & compose validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Byte-compile all Python
+        run: |
+          python -m compileall -q \
+            ingestion_api simulator spark/jobs consumption_api \
+            dashboard orchestration tests
+
+      - name: Validate docker-compose
+        run: |
+          cp .env.example .env
+          docker compose config -q
+          echo "docker-compose.yml is valid"

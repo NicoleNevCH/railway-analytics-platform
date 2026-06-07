@@ -1,5 +1,8 @@
 # 🚆 Railway Analytics Platform — Local Lakehouse
 
+<!-- Replace <user>/<repo> with your GitHub path so the badge resolves. -->
+![CI](https://github.com/<user>/railway-analytics-platform/actions/workflows/ci.yml/badge.svg)
+
 A **multi-container** data engineering platform that simulates train operational
 telemetry (inspired by **ÖBB**, the Austrian railway) and processes it in a
 local **lakehouse**, end to end, with real business rules and **intentional
@@ -114,9 +117,14 @@ railway-analytics-platform/
 │   └── Dockerfile              #   Spark + Iceberg/S3A jars baked in
 │
 ├── consumption_api/            # Consumption API (FastAPI + DuckDB)
-│   ├── main.py                 #   /stats/*, /trips/*, /refresh
+│   ├── main.py                 #   /stats/*, /trips/*, /pipeline/status, /refresh
 │   ├── duckdb_engine.py        #   DuckDB → Iceberg in MinIO
 │   ├── config.py
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── dashboard/                  # Streamlit UI (KPIs, charts, chaos generator)
+│   ├── app.py
 │   ├── requirements.txt
 │   └── Dockerfile
 │
@@ -189,6 +197,7 @@ Quick access after `make up`:
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
+| **Dashboard (Streamlit)** | http://localhost:8501 | — |
 | MinIO Console | http://localhost:9001 | `minioadmin` / `minioadmin` |
 | Ingestion API | http://localhost:8000/docs | — |
 | Consumption API | http://localhost:8001/docs | — |
@@ -225,6 +234,7 @@ even after receiving several updates. (The notebook has the same proof.)
 | Method | Route | Description |
 |--------|-------|-------------|
 | `GET` | `/health` | Service status |
+| `GET` | `/pipeline/status` | Health board: raw events in Bronze, rows in Silver, latest snapshot, rejects per DLQ. Never errors — reports zero when empty |
 | `GET` | `/stats/punctuality` | KPIs: total, delayed, on time, % on time, average/max delay |
 | `GET` | `/trips/delayed?min_delay=&limit=` | Delayed trips (filter by minimum delay) |
 | `GET` | `/stats/by-station` | Aggregations per station |
@@ -244,12 +254,30 @@ even after receiving several updates. (The notebook has the same proof.)
 
 ---
 
+## 📊 Dashboard (Streamlit)
+
+A friendly UI over the two APIs, at **http://localhost:8501**. It shows the
+pipeline status board (Bronze / Silver / DLQ counts), the punctuality KPIs, and
+charts for delay by operator and by station, plus a table of the worst delays.
+
+It also has a **chaos generator** in the sidebar: set the trip count and defect
+rates, click *Send events*, and watch the accept/reject scoreboard — the
+validation gate, live. After sending, run `make process` and click *Refresh
+data* to see the new trips flow into the analytics.
+
 ## 📓 Exploration notebook
 
 Open Jupyter (http://localhost:8888, token `railway`) and run
 `work/exploration.ipynb`. It connects DuckDB to Iceberg in MinIO, locates the
 most recent metadata and reproduces the KPIs, the worst delays, a chart of delay
 per operator, and the proof of the UPSERT.
+
+## ✅ Continuous integration
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and
+pull request: it executes the test suite, byte-compiles all Python, and
+validates `docker-compose.yml`. Update the badge path at the top of this file
+with your `<user>/<repo>` so it resolves.
 
 ---
 
@@ -285,6 +313,11 @@ per operator, and the proof of the UPSERT.
 
 ## 🧯 Troubleshooting
 
+- **`bitnami/spark:3.5.1: not found` during `make build`** → as of Aug 2025
+  Bitnami moved its Docker Hub images to the `bitnamilegacy/` namespace. The
+  Spark Dockerfile already pins `bitnamilegacy/spark:3.5.1`; if even that tag is
+  gone someday, change the `FROM` line in `spark/Dockerfile` to
+  `bitnamilegacy/spark:3.5` or migrate to a maintained base (`apache/spark`).
 - **The 1st `make build` fails downloading jars/images** → it is the network.
   Check internet access and run it again (the build is layer-cached).
 - **`make process` complains about connecting to Spark** → check `make ps`; the
@@ -327,8 +360,7 @@ console are the best starting points.
   (**REST / Nessie / Glue**) to support multiple writers with atomic commits.
 - Use real, segregated credentials (no `minioadmin`); manage secrets outside
   `.env`.
-- Reassess DuckDB's local conveniences
-  (`unsafe_enable_version_guessing`, `allow_moved_paths`).
+- Reassess DuckDB's local convenience (`unsafe_enable_version_guessing`).
 - Size Spark (memory/cores/executors) according to the real volume.
 
 ---
