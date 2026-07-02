@@ -13,6 +13,7 @@ Endpoints:
   GET  /stats/by-station           -> average delay per current station
   GET  /stats/by-operator          -> volume and punctuality per operator
   GET  /stats/delay-distribution   -> histogram of trips by delay band
+  POST /ask                        -> natural-language question -> SQL -> rows
   GET  /trips/{trip_id}            -> the single consolidated row of a trip
   POST /refresh                    -> reloads the Iceberg metadata pointer
 """
@@ -22,9 +23,12 @@ from __future__ import annotations
 import logging
 
 import boto3
+import httpx
 from botocore.client import Config as BotoConfig
 from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel
 
+from . import nl2sql
 from .config import settings
 from .duckdb_engine import IcebergQueryEngine
 
@@ -228,6 +232,60 @@ def delay_distribution():
         4: "5) unknown",
     }
     return [{"bucket": labels[r["bucket_ord"]], "trips": r["trips"]} for r in rows]
+
+
+class AskRequest(BaseModel):
+    question: str
+
+
+@app.post("/ask")
+def ask(req: AskRequest):
+    """
+    Text-to-SQL: turn a natural-language question into a guarded DuckDB query.
+
+    The generated SQL is validated (read-only, single SELECT, LIMIT enforced)
+    and returned alongside the rows, so the caller can always audit what ran.
+    """
+    question = req.question.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail={"error": "question is empty"})
+
+    if nl2sql.api_key() is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "AI is not configured.",
+                "hint": "Set OPENAI_API_KEY in your .env and restart the "
+                        "consumption-api service to enable /ask.",
+            },
+        )
+
+    try:
+        raw = nl2sql.generate_sql(question)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "The AI provider returned an error.",
+                    "reason": f"HTTP {exc.response.status_code}"},
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": "Could not reach the AI provider.", "reason": str(exc)},
+        ) from exc
+
+    try:
+        sql = nl2sql.validate_sql(raw)
+    except ValueError as exc:
+        # The model produced something unsafe/invalid — refuse to run it.
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Generated SQL failed the safety checks.",
+                    "reason": str(exc), "generated_sql": raw},
+        ) from exc
+
+    rows = _safe_query(sql)
+    return {"question": question, "sql": sql, "row_count": len(rows), "rows": rows}
 
 
 @app.get("/trips/{trip_id}")

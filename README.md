@@ -240,6 +240,7 @@ even after receiving several updates. (The notebook has the same proof.)
 | `GET` | `/stats/by-station` | Aggregations per station |
 | `GET` | `/stats/by-operator` | Aggregations per operator |
 | `GET` | `/stats/delay-distribution` | Histogram of trips by delay band (0-5, 5-15, 15-30, 30+) |
+| `POST` | `/ask` | **GenAI text-to-SQL**: natural-language question → guarded read-only DuckDB query → rows + the generated SQL |
 | `GET` | `/trips/{trip_id}` | State of a trip (proves the UPSERT) |
 | `POST` | `/refresh` | Reloads the DuckDB view onto the most recent Iceberg metadata |
 
@@ -267,6 +268,31 @@ It also has a **chaos generator** in the sidebar, with plain-language controls
 and defect rates, click *Send events*, and watch the accept/reject scoreboard —
 the validation gate, live. After sending, run `make process` and click *Refresh
 data* to see the new trips flow into the analytics.
+
+## 🤖 Ask the data (GenAI text-to-SQL)
+
+The dashboard has an **"Ask the data"** box (and the API a `POST /ask`
+endpoint): type a question in plain language — *"Which 5 stations have the
+worst average delay?"* — and an LLM (OpenAI) writes a DuckDB query over the
+Iceberg table. The answer comes back as a table/chart **together with the
+generated SQL**, so every AI answer is auditable.
+
+Safety is defense-in-depth, enforced in `consumption_api/nl2sql.py` and covered
+by unit tests (`tests/test_nl2sql_guardrails.py`):
+
+- The model only ever returns **text** — it has no database or tool access.
+- The generated SQL must be a **single read-only SELECT** (or `WITH ... SELECT`).
+- Write/DDL/extension keywords (`INSERT`, `DROP`, `ATTACH`, `INSTALL`, ...) and
+  dangerous functions (`set_config`, `read_csv`, `glob`, `getenv`) are blocked.
+- A `LIMIT 200` is appended when missing.
+- Anything that fails validation returns **400 with the rejected SQL shown** —
+  it never reaches DuckDB.
+
+**Setup:** put your key in `.env` (`OPENAI_API_KEY=sk-...`, get one at
+https://platform.openai.com/api-keys), then `docker compose up -d consumption-api`.
+Without a key, the platform runs normally and `/ask` returns a friendly 503
+explaining how to enable it. The model defaults to `gpt-4o-mini` (configurable
+via `OPENAI_MODEL`).
 
 ## 📓 Exploration notebook
 

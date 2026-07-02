@@ -167,6 +167,9 @@ services:
       ICEBERG_WAREHOUSE_PREFIX: "warehouse"
       ICEBERG_NAMESPACE: "${ICEBERG_NAMESPACE:-railway}"
       ICEBERG_TABLE: "${ICEBERG_TABLE:-train_events}"
+      # Text-to-SQL (/ask). Leave OPENAI_API_KEY empty to disable the feature.
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
     ports:
       - "8001:8001"
     depends_on:

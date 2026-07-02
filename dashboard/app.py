@@ -212,3 +212,60 @@ if isinstance(delayed, list) and delayed:
     st.caption(f"{len(ddf)} trips delayed more than {min_delay} min.")
 else:
     st.write("No trips above that threshold.")
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# Ask the data (GenAI text-to-SQL)
+# ---------------------------------------------------------------------------
+st.subheader("💬 Ask the data")
+st.caption(
+    "Type a question about the trains and get the answer straight from the "
+    "data — you'll also see the exact query that produced it."
+)
+
+question = st.text_input(
+    "Your question",
+    placeholder="Which stations have the worst delays?",
+    key="ask_question",
+)
+
+if st.button("Ask ▶", key="ask_button") and question.strip():
+    with st.spinner("Thinking..."):
+        try:
+            r = httpx.post(
+                f"{CONSUMPTION_URL}/ask", json={"question": question}, timeout=120
+            )
+            body = r.json()
+            if r.status_code == 503:
+                st.info(
+                    "**This feature needs an OpenAI key.** Put `OPENAI_API_KEY` in "
+                    "your `.env`, then run `docker compose up -d consumption-api`."
+                )
+            elif r.status_code == 400:
+                st.warning(
+                    f"That question produced a query we don't run "
+                    f"({body['detail'].get('reason', '')}). Try rephrasing it."
+                )
+                st.code(body["detail"].get("generated_sql", ""), language="sql")
+            elif r.status_code != 200:
+                st.error(f"Something went wrong ({r.status_code}): {body.get('detail', body)}")
+            else:
+                st.code(body["sql"], language="sql")
+                rows = body["rows"]
+                if not rows:
+                    st.write("Nothing in the data matches that.")
+                else:
+                    adf = pd.DataFrame(rows)
+                    # Single value -> big metric; otherwise table + auto chart.
+                    if len(adf) == 1 and len(adf.columns) == 1:
+                        st.metric(adf.columns[0], adf.iloc[0, 0])
+                    else:
+                        st.dataframe(adf, use_container_width=True, hide_index=True)
+                        num_cols = adf.select_dtypes("number").columns
+                        text_cols = [c for c in adf.columns if c not in num_cols]
+                        if len(adf) > 1 and len(num_cols) >= 1 and text_cols:
+                            st.bar_chart(adf.set_index(text_cols[0])[num_cols[0]])
+                    st.caption(f"{body['row_count']} row(s).")
+        except httpx.HTTPError as exc:
+            st.error(f"Could not reach the consumption API: {exc}")
